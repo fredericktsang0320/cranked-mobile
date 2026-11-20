@@ -52,15 +52,27 @@
     grid-area: display; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 44px;
     align-items: start; gap: 5px;
   }
+  .display-buttons { display: grid; gap: 4px; }
   .screen {
     background: var(--frame); border-radius: 7px; padding: clamp(5px, 1.4vw, 8px);
     display: flex; justify-content: center; align-items: center; position: relative; min-width: 0;
   }
-  .screen:fullscreen { border-radius: 0; padding: 0; }
   /* --ar: the shown image's width over its height (the screen's 5 / 3, or the drawn device's) */
   canvas { width: 100%; max-width: 800px; aspect-ratio: var(--ar, 1.6667); image-rendering: pixelated; background: #b1aea7; display: block; }
   canvas.device { background: transparent; }
-  .screen:fullscreen canvas { max-width: none; width: min(100vw, calc(100vh * var(--ar, 1.6667))); }
+  #player:is(:fullscreen, .expanded) {
+    --screen-clearance: 60px;
+    display: grid; align-content: safe center; overflow: auto; background: var(--bg);
+    padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right))
+      max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  }
+  #player:is(:fullscreen, .expanded) .deck {
+    width: min(100%, 820px); margin-inline: auto; border-bottom: 1px solid var(--shell-line); border-radius: 16px;
+  }
+  #player:is(:fullscreen, .expanded) .bar { display: none; }
+  #player.expanded { position: fixed; inset: 0; z-index: 2; }
+  body.game-expanded { overflow: hidden; }
+  body.game-expanded main > :not(#player) { visibility: hidden; }
   .look { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; margin-top: 8px; }
   .look label { display: inline-flex; gap: 6px; align-items: center; }
   .look [hidden] { display: none; }
@@ -76,6 +88,7 @@
     min-height: 44px; display: inline-flex; align-items: center;
   }
   .bar button { padding-inline: clamp(8px, 2.45vw, 12px); }
+  .tools [hidden], #exitFull[hidden] { display: none; }
   .bar .primary { background: var(--fg); color: var(--bg); border-color: var(--fg); font-weight: 650; }
   .bar .primary:hover { border-color: var(--accent); }
   label.btn, a.btn, button { border: 1px solid var(--line); background: var(--panel); color: var(--fg); border-radius: 8px;
@@ -114,6 +127,15 @@
     content: ""; width: 12px; height: 2px; border-radius: 1px; background: currentColor;
     box-shadow: 0 -4px currentColor, 0 4px currentColor;
   }
+  #exitFull {
+    position: relative; width: 44px; height: 44px; border: 0; border-radius: 8px;
+    padding: 0; background: transparent; color: var(--key-ink);
+  }
+  #exitFull::before, #exitFull::after {
+    content: ""; position: absolute; top: 21px; left: 14px; width: 16px; height: 2px;
+    border-radius: 1px; background: currentColor; rotate: 45deg;
+  }
+  #exitFull::after { rotate: -45deg; }
   .dpad {
     --cross: polygon(33.333% 0, 66.667% 0, 66.667% 33.333%, 100% 33.333%, 100% 66.667%,
       66.667% 66.667%, 66.667% 100%, 33.333% 100%, 33.333% 66.667%, 0 66.667%, 0 33.333%, 33.333% 33.333%);
@@ -177,10 +199,10 @@
       gap: 6px 10px; padding: 10px;
     }
     .display-row {
-      width: min(100%, calc(max(144px, 100dvh - 144px) * 1.6667 + 65px));
+      width: min(100%, calc(max(144px, 100dvh - var(--screen-clearance, 144px)) * 1.6667 + 65px));
       justify-self: center;
     }
-    .screen:not(:fullscreen) canvas { width: min(100%, calc(max(144px, 100dvh - 144px) * var(--ar, 1.6667))); }
+    .screen canvas { width: min(100%, calc(max(144px, 100dvh - var(--screen-clearance, 144px)) * var(--ar, 1.6667))); }
     .crank-control { align-self: end; }
     .ab { align-self: start; }
   }
@@ -198,11 +220,14 @@
     <h1 id="siteTitle">Cranked</h1>
     <p class="sub" id="siteSub">Playdate emulator</p>
   </header>
-  <section aria-label="Playdate player">
+  <section id="player" aria-label="Playdate player">
     <div class="deck">
       <div class="display-row">
         <div class="screen" id="screen"><canvas id="lcd" width="400" height="240"></canvas></div>
-        <button class="pad menu" type="button" data-bit="128" aria-label="Menu" title="Menu"><span aria-hidden="true"></span></button>
+        <div class="display-buttons">
+          <button class="pad menu" type="button" data-bit="128" aria-label="Menu" title="Menu"><span aria-hidden="true"></span></button>
+          <button id="exitFull" type="button" aria-label="Exit fullscreen" title="Exit fullscreen" hidden></button>
+        </div>
       </div>
       <div class="dpad" role="group" aria-label="Directional pad">
         <button class="pad arrow up" type="button" data-bit="4" aria-label="Up"></button>
@@ -229,27 +254,24 @@
     </div>
   </section>
   <p id="status">Loading engine...</p>
-
-  <div class="site-only" id="catalogSection" hidden>
-    <h2 id="catalogTitle">Games</h2>
-    <ul class="library" id="catalog"></ul>
+  <div class="tools" role="group" aria-label="Game tools">
+    <a class="btn site-only" id="browseGames" href="#catalogSection" hidden>Games</a>
+    <button class="site-only" id="openFolder" type="button">Open .pdx folder</button>
+    <input type="file" id="folder" webkitdirectory>
+    <button id="full" type="button" aria-controls="player" aria-expanded="false">Fullscreen</button>
+    <button id="shot" type="button" disabled>Screenshot</button>
+    <button id="exportSaves" type="button" disabled>Export saves</button>
+    <button id="importLabel" type="button" disabled>Import saves</button>
+    <input type="file" id="importSaves" accept=".zip">
+    <button id="crankDock" type="button">Undock crank</button>
   </div>
+
   <div class="site-only">
     <h2>Library</h2>
     <ul class="library" id="library"></ul>
     <p class="empty" id="empty">Games you open are kept here, in this browser, to play again without picking the file.</p>
   </div>
 
-  <details>
-    <summary>More tools</summary>
-    <div class="tools">
-      <label class="btn site-only">Open .pdx folder<input type="file" id="folder" webkitdirectory></label>
-      <button id="full" type="button">Fullscreen</button>
-      <button id="shot" type="button" disabled>Screenshot</button>
-      <button id="exportSaves" type="button" disabled>Export saves</button>
-      <label class="btn" id="importLabel">Import saves<input type="file" id="importSaves" accept=".zip"></label>
-    </div>
-  </details>
   <details id="lookPanel">
     <summary>Screen</summary>
     <div class="look">
@@ -279,6 +301,10 @@
       <tr><td>Saves</td><td>kept in this browser (IndexedDB); Export saves and Import saves move them between browsers</td></tr>
     </table>
   </details>
+  <section class="site-only" id="catalogSection" aria-labelledby="catalogTitle" hidden>
+    <h2 id="catalogTitle">Games</h2>
+    <ul class="library" id="catalog"></ul>
+  </section>
   <footer>
     Playdate fonts by Panic Inc., licensed under <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener" target="_blank">CC BY 4.0</a>.
     Playdate is a trademark of Panic Inc. This project is not affiliated with Panic.
@@ -293,8 +319,10 @@
 const BUTTONS = { ArrowLeft: 1, ArrowRight: 2, ArrowUp: 4, ArrowDown: 8, KeyZ: 16, KeyX: 32, Enter: 128, Escape: 128 };
 const RATE = 44100;
 const $ = id => document.getElementById(id);
-const status = $("status"), screen = $("screen");
+const status = $("status"), screen = $("screen"), player = $("player");
 $("openZip").onclick = () => $("zipfile").click();
+$("openFolder").onclick = () => $("folder").click();
+$("importLabel").onclick = () => $("importSaves").click();
 const ctx2d = $("lcd").getContext("2d");
 let ready = false, running = false, paused = false, buttons = 0, crank = 0, docked = true;
 let currentFolder = "", currentEntry = null;
@@ -495,7 +523,11 @@ async function renderCatalog() {
     const page = webUrl(typeof g.page === "string" ? g.page : "");
     if (typeof g.url === "string" || typeof g.download === "string") {
       const play = document.createElement("button"); play.textContent = "Play";
-      play.onclick = () => typeof g.url === "string" ? playUrl(g.url, g) : playUrl(g.download, g, true);
+      play.onclick = () => {
+        player.scrollIntoView({ block: "start" });
+        if (typeof g.url === "string") playUrl(g.url, g);
+        else playUrl(g.download, g, true);
+      };
       li.append(play);
     } else if (page) { // only the author's page: the game is downloaded there and opened here
       const a = document.createElement("a"); a.className = "btn"; a.href = page; a.target = "_blank"; a.rel = "noopener";
@@ -504,6 +536,7 @@ async function renderCatalog() {
     ul.append(li);
   }
   $("catalogSection").hidden = false;
+  $("browseGames").hidden = false;
 }
 
 // ---------- save data: exported as a zip of the game's data folder, and imported from one ----------
@@ -536,7 +569,7 @@ function savesImported(msg) {
 // ---------- buttons: pause, fullscreen, screenshot, sound ----------
 function updateButtons() {
   $("pause").disabled = !running; $("shot").disabled = !running; $("exportSaves").disabled = !running || !currentFolder;
-  $("importLabel").style.display = running && currentFolder ? "" : "none";
+  $("importLabel").disabled = !running || !currentFolder;
   $("pause").textContent = paused ? "Resume" : "Pause";
 }
 function setPaused(on) {
@@ -550,7 +583,29 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden && running && !paused) { hiddenPause = true; setPaused(true); }
   else if (!document.hidden && hiddenPause) { hiddenPause = false; setPaused(false); }
 });
-$("full").onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else screen.requestFullscreen().catch(() => {}); };
+function syncFullscreen() {
+  const active = document.fullscreenElement === player || player.classList.contains("expanded");
+  if (active === ($("full").getAttribute("aria-expanded") === "true")) return;
+  $("full").setAttribute("aria-expanded", String(active));
+  $("exitFull").hidden = !active;
+  $(active ? "exitFull" : "full").focus({ preventScroll: true });
+}
+$("full").onclick = async () => {
+  if (document.fullscreenEnabled && typeof player.requestFullscreen === "function") {
+    try { await player.requestFullscreen(); return; } catch (e) {}
+  }
+  player.classList.add("expanded");
+  document.body.classList.add("game-expanded");
+  syncFullscreen();
+};
+function exitFullscreen() {
+  if (document.fullscreenElement === player) { document.exitFullscreen(); return; }
+  player.classList.remove("expanded");
+  document.body.classList.remove("game-expanded");
+  syncFullscreen();
+}
+$("exitFull").onclick = exitFullscreen;
+document.addEventListener("fullscreenchange", syncFullscreen);
 $("shot").onclick = () => { // at least 800 pixels wide, at a whole multiple of the image
   const lcd = $("lcd"), k = Math.max(1, Math.ceil(800 / lcd.width));
   const c = document.createElement("canvas"); c.width = lcd.width * k; c.height = lcd.height * k;
@@ -606,7 +661,12 @@ function ensureAudio() { // browsers start audio only after a user gesture
 
 // ---------- input ----------
 function turn(degrees) { crank = ((crank + degrees) % 360 + 360) % 360; docked = false; sendInput(); }
+function toggleCrankDock() { docked = !docked; sendInput(); }
+$("crankDock").onclick = toggleCrankDock;
 addEventListener("keydown", e => {
+  if (e.code === "Escape" && $("full").getAttribute("aria-expanded") === "true") {
+    e.preventDefault(); exitFullscreen(); return;
+  }
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
   if (e.code === "Enter" && e.target instanceof Element && e.target.closest("button:not(.pad), summary, a")) return;
   if (e.target === dial && e.code.startsWith("Arrow")) {
@@ -615,7 +675,7 @@ addEventListener("keydown", e => {
   if (e.code in BUTTONS) { buttons |= BUTTONS[e.code]; e.preventDefault(); sendInput(); }
   else if (e.code === "Comma") turn(-10);
   else if (e.code === "Period") turn(10);
-  else if (e.code === "KeyC") { docked = !docked; sendInput(); }
+  else if (e.code === "KeyC") toggleCrankDock();
   else if (e.code === "KeyP" && !e.repeat) setPaused(!paused);
   ensureAudio();
 });
@@ -718,7 +778,7 @@ new ResizeObserver(() => sendLook()).observe($("lcd")); // the scale follows the
 showLook(); sendLook();
 
 // ---------- drawing: the newest frame from the worker, once per animation frame ----------
-let image = null, shownAt = 0, shownCrank = 0, latestWidth = 400, latestHeight = 240;
+let image = null, shownAt = 0, shownCrank = 0, shownDocked = true, latestWidth = 400, latestHeight = 240;
 function draw(time) {
   pollPads();
   if (latest) {
@@ -735,14 +795,23 @@ function draw(time) {
     dial.style.setProperty("--angle", crank + "deg");
     dial.setAttribute("aria-valuenow", Math.floor(crank));
   }
+  if (shownDocked !== docked) {
+    shownDocked = docked;
+    $("crankDock").textContent = docked ? "Undock crank" : "Dock crank";
+  }
   if (running && !paused && time - shownAt > 500) { shownAt = time; setStatus("Running \u00b7 " + frameMs.toFixed(2) + " ms per step"); }
   requestAnimationFrame(draw);
 }
 requestAnimationFrame(draw);
 
 // Installable and usable offline (a service worker needs https or localhost)
-if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1"))
+if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
+  navigator.serviceWorker.addEventListener("controllerchange", async () => {
+    await siteLoaded;
+    if (!site.game) renderCatalog();
+  });
   navigator.serviceWorker.register("sw.js").catch(e => console.warn("service worker", e));
+}
 </script>
 </body>
 </html>

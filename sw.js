@@ -1,7 +1,7 @@
 // Service worker for the browser front end: the page, the engine and the icons are cached, so the page
 // works offline once loaded. Bump VERSION when any of the files change.
 const CACHE_PREFIX = "cranked-pwa-";
-const VERSION = CACHE_PREFIX + "3";
+const VERSION = CACHE_PREFIX + "4";
 const FILES = ["./", "index.html", "engine.js", "worker.js", "audio-worklet.js", "zip.js", "cranked.js", "cranked.wasm", "manifest.webmanifest", "icon-192.png", "icon-512.png", "site.json", "games.json"];
 self.addEventListener("install", e => e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES)).then(() => self.skipWaiting())));
 self.addEventListener("activate", e => e.waitUntil(caches.keys().then(keys =>
